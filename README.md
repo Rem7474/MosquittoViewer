@@ -15,7 +15,7 @@ It provides authentication, live streaming over WebSocket, filtering, and export
 ## Prerequisites
 
 - Go 1.21+
-- Node.js 18+
+- Node.js 20+ (Vite requires minimum Node 20.19+ or 22.12+)
 - npm
 - OpenSSL
 - GNU Make (or compatible `make`)
@@ -115,17 +115,22 @@ Browser
 make build
 ```
 
+Install binary and config to system paths:
+
+```bash
+sudo make install
+```
+
 This builds:
 - Frontend into [web](web)
 - Backend binary at `bin/mosquitto-viewer`
 
 ## Deployment
 
-1. Copy binary to `/usr/local/bin/mosquitto-viewer`.
-2. Copy config to `/etc/mosquitto-viewer/config.yaml`.
-3. Install systemd unit from [deployments/mosquitto-viewer.service](deployments/mosquitto-viewer.service).
-4. Configure Nginx from [deployments/nginx.conf](deployments/nginx.conf).
-5. Enable and start service:
+1. Run `sudo make install`.
+2. Install systemd unit from [deployments/mosquitto-viewer.service](deployments/mosquitto-viewer.service).
+3. Configure Nginx from [deployments/nginx.conf](deployments/nginx.conf).
+4. Enable and start service:
 
 ```bash
 sudo systemctl daemon-reload

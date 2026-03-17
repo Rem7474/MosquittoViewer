@@ -1,4 +1,8 @@
-.PHONY: dev build clean install-tools gen-keys hash-password
+.PHONY: dev build install clean install-tools gen-keys hash-password
+
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+SYSCONFDIR ?= /etc/mosquitto-viewer
 
 gen-keys:
 	@[ -f configs/jwt_rs256.pem ] || openssl genrsa -out configs/jwt_rs256.pem 2048
@@ -11,8 +15,17 @@ dev: gen-keys
 	  wait
 
 build: gen-keys
+	@node -v | grep -E 'v(2[0-9]|[3-9][0-9])\.' > /dev/null || (echo "Error: Node.js 20+ required for Vite. Current version: $$(node -v)" && exit 1)
 	cd frontend && npm install && npm run build
 	go build -ldflags="-s -w" -o bin/mosquitto-viewer ./cmd/server
+
+install: build
+	install -d $(BINDIR)
+	install -m 0755 bin/mosquitto-viewer $(BINDIR)/mosquitto-viewer
+	install -d $(SYSCONFDIR)
+	install -m 0644 configs/config.yaml $(SYSCONFDIR)/config.yaml
+	install -m 0600 configs/jwt_rs256.pem $(SYSCONFDIR)/jwt_rs256.pem
+	install -m 0644 configs/jwt_rs256_pub.pem $(SYSCONFDIR)/jwt_rs256_pub.pem
 
 clean:
 	rm -rf bin/ web/assets web/index.html frontend/dist
