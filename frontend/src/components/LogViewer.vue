@@ -73,8 +73,9 @@ import { useWebSocket } from '../composables/useWebSocket'
 import type { LogEntry } from '../types/log'
 
 const { logout, accessToken, authFetch } = useAuth()
-const { filters, filteredEntries, countByLevel, totalCount, ratePerSecond, push, replaceEntries, clear, exportJSON, exportCSV } = useLogStore(1000)
-const { connected, paused, connect, disconnect, pause, resume, on } = useWebSocket(() => accessToken.value, 1000)
+const MAX_LOGS = 200
+const { filters, filteredEntries, countByLevel, totalCount, ratePerSecond, push, replaceEntries, clear, exportJSON, exportCSV } = useLogStore(MAX_LOGS)
+const { connected, paused, connect, disconnect, pause, resume, on } = useWebSocket(() => accessToken.value, MAX_LOGS)
 
 const selected = ref<LogEntry | null>(null)
 const wsConnected = computed(() => connected.value)
@@ -91,7 +92,7 @@ on('entry', (entry) => {
 
 async function syncLogs() {
   if (paused.value) return
-  const res = await authFetch('/api/logs?limit=1000')
+  const res = await authFetch(`/api/logs?limit=${MAX_LOGS}`)
   const data = await res.json() as { data: LogEntry[] }
   replaceEntries(data.data)
 }

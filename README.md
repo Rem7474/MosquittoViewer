@@ -46,7 +46,7 @@ Main config is [configs/config.yaml](configs/config.yaml).
 - `log.path`: Mosquitto log file path.
 - `log.format`: `mosquitto_standard` or `custom`.
 - `log.custom_regex`: named groups for custom parser (`ts`, `level`, `plugin`, `msg`, `client_id`, `topic`).
-- `log.buffer_size`: in-memory ring buffer size.
+- `log.buffer_size`: in-memory ring buffer size (default 200, old entries are evicted dynamically).
 - `auth.users`: local users with bcrypt hash.
 - `auth.jwt.*`: RS256 key paths and token TTLs.
 - `sqlite.enabled`: optional historical storage.
