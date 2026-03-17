@@ -1,0 +1,20 @@
+[Unit]
+Description=MosquittoViewer MQTT Log Dashboard
+After=network.target mosquitto.service
+
+[Service]
+Type=simple
+User=mosquitto-viewer
+Group=mosquitto-viewer
+ExecStart=/usr/local/bin/mosquitto-viewer --config /etc/mosquitto-viewer/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/var/log/mosquitto
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

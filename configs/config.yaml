@@ -1,0 +1,25 @@
+server:
+  port: 8080
+  host: "127.0.0.1"
+
+log:
+  path: "/var/log/mosquitto/mosquitto.log"
+  format: "mosquitto_standard"
+  # custom_regex: '^(?P<ts>\d+): \[(?P<level>\w+)\] \[(?P<plugin>\w+)\] (?P<msg>.+)$'
+  buffer_size: 1000
+
+auth:
+  users:
+    - username: "admin"
+      password_hash: "$2a$12$REMPLACER_PAR_VRAI_HASH"
+  jwt:
+    private_key_path: "./configs/jwt_rs256.pem"
+    public_key_path: "./configs/jwt_rs256_pub.pem"
+    access_token_ttl: "15m"
+    refresh_token_ttl: "168h"
+
+sqlite:
+  enabled: false
+  path: "./mosquitto-viewer.db"
+
+debug: false
