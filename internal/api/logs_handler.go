@@ -43,16 +43,30 @@ func (s *Server) GetLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	all := s.watcher.Recent(0, filters)
-	if offset >= len(all) {
+	total := len(all)
+	if offset >= total {
 		writeJSON(w, http.StatusOK, map[string]any{"data": []logwatcher.LogEntry{}, "total": len(all)})
 		return
 	}
-	end := offset + limit
-	if end > len(all) {
-		end = len(all)
+
+	// Tail semantics: return most recent entries first based on limit/offset.
+	end := total - offset
+	start := end - limit
+	if start < 0 {
+		start = 0
 	}
+	if end < 0 {
+		end = 0
+	}
+	window := all[start:end]
+
+	// API returns newest first.
+	for i, j := 0, len(window)-1; i < j; i, j = i+1, j-1 {
+		window[i], window[j] = window[j], window[i]
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"data":  all[offset:end],
+		"data":  window,
 		"total": len(all),
 	})
 }

@@ -189,11 +189,13 @@ func (w *Watcher) readNewLines() error {
 		id := w.nextID.Add(1)
 		entry, err := w.parser.ParseLine(line, id)
 		if err != nil {
+			level := "INFO"
 			if w.config.Debug {
-				entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: "DEBUG", Message: line, Raw: line}
+				level = "DEBUG"
 			} else {
-				continue
+				level = detectLevel(line)
 			}
+			entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: level, Message: line, Raw: line}
 		}
 		w.append(entry)
 		w.publish(entry)
@@ -266,11 +268,13 @@ func (w *Watcher) bootstrapRecentEntries() error {
 		id := w.nextID.Add(1)
 		entry, err := w.parser.ParseLine(line, id)
 		if err != nil {
+			level := "INFO"
 			if w.config.Debug {
-				entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: "DEBUG", Message: line, Raw: line}
+				level = "DEBUG"
 			} else {
-				continue
+				level = detectLevel(line)
 			}
+			entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: level, Message: line, Raw: line}
 		}
 		w.append(entry)
 	}

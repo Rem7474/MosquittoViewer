@@ -91,7 +91,7 @@ on('entry', (entry) => {
 
 async function syncLogs() {
   if (paused.value) return
-  const res = await authFetch('/api/logs?limit=200')
+  const res = await authFetch('/api/logs?limit=1000')
   const data = await res.json() as { data: LogEntry[] }
   replaceEntries(data.data)
 }
