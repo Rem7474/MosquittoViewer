@@ -133,12 +133,20 @@ This builds:
 sudo make install
 ```
 
+This also creates the system user/group `mosquitto-viewer` when missing.
+
 2. Install and enable systemd service:
 
 ```bash
 sudo make install-systemd
 sudo make systemd-reload
 sudo make enable-service
+```
+
+Shortcut:
+
+```bash
+sudo make systemd
 ```
 
 3. Configure a reverse proxy:
@@ -204,6 +212,16 @@ sudo systemctl reload httpd
 4. Optional service commands:
 
 ```bash
+sudo make restart-service
+sudo make service-status
+```
+
+If you get `status=217/USER`, run:
+
+```bash
+sudo make prepare-service-user
+sudo make install
+sudo make systemd
 sudo make restart-service
 sudo make service-status
 ```

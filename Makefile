@@ -1,10 +1,12 @@
-.PHONY: dev build install install-systemd systemd systemd-reload enable-service restart-service service-status deploy clean install-tools gen-keys hash-password
+.PHONY: dev build install prepare-service-user install-systemd systemd systemd-reload enable-service restart-service service-status deploy clean install-tools gen-keys hash-password
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 SYSCONFDIR ?= /etc/mosquitto-viewer
 SYSTEMD_UNITDIR ?= /etc/systemd/system
 SERVICE_NAME ?= mosquitto-viewer
+SERVICE_USER ?= mosquitto-viewer
+SERVICE_GROUP ?= mosquitto-viewer
 
 gen-keys:
 	@[ -f configs/jwt_rs256.pem ] || openssl genrsa -out configs/jwt_rs256.pem 2048
@@ -21,19 +23,23 @@ build: gen-keys
 	cd frontend && npm install && npm run build
 	go build -ldflags="-s -w" -o bin/mosquitto-viewer ./cmd/server
 
-install: build
+prepare-service-user:
+	@getent group $(SERVICE_GROUP) >/dev/null || groupadd --system $(SERVICE_GROUP)
+	@id -u $(SERVICE_USER) >/dev/null 2>&1 || useradd --system --gid $(SERVICE_GROUP) --home-dir /nonexistent --shell /usr/sbin/nologin $(SERVICE_USER)
+
+install: build prepare-service-user
 	install -d $(BINDIR)
 	install -m 0755 bin/mosquitto-viewer $(BINDIR)/mosquitto-viewer
-	install -d $(SYSCONFDIR)
-	install -m 0644 configs/config.yaml $(SYSCONFDIR)/config.yaml
-	install -m 0600 configs/jwt_rs256.pem $(SYSCONFDIR)/jwt_rs256.pem
-	install -m 0644 configs/jwt_rs256_pub.pem $(SYSCONFDIR)/jwt_rs256_pub.pem
+	install -d -m 0750 -o root -g $(SERVICE_GROUP) $(SYSCONFDIR)
+	install -m 0640 -o root -g $(SERVICE_GROUP) configs/config.yaml $(SYSCONFDIR)/config.yaml
+	install -m 0640 -o root -g $(SERVICE_GROUP) configs/jwt_rs256.pem $(SYSCONFDIR)/jwt_rs256.pem
+	install -m 0644 -o root -g $(SERVICE_GROUP) configs/jwt_rs256_pub.pem $(SYSCONFDIR)/jwt_rs256_pub.pem
 
 install-systemd:
 	install -d $(SYSTEMD_UNITDIR)
 	install -m 0644 deployments/mosquitto-viewer.service $(SYSTEMD_UNITDIR)/$(SERVICE_NAME).service
 
-systemd: install-systemd systemd-reload enable-service
+systemd: prepare-service-user install-systemd systemd-reload enable-service
 
 systemd-reload:
 	systemctl daemon-reload
