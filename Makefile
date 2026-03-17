@@ -11,7 +11,7 @@ dev: gen-keys
 	  wait
 
 build: gen-keys
-	cd frontend && npm run build
+	cd frontend && npm install && npm run build
 	go build -ldflags="-s -w" -o bin/mosquitto-viewer ./cmd/server
 
 clean:
