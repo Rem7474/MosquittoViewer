@@ -1,8 +1,10 @@
-.PHONY: dev build install clean install-tools gen-keys hash-password
+.PHONY: dev build install install-systemd systemd-reload enable-service restart-service service-status deploy clean install-tools gen-keys hash-password
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 SYSCONFDIR ?= /etc/mosquitto-viewer
+SYSTEMD_UNITDIR ?= /etc/systemd/system
+SERVICE_NAME ?= mosquitto-viewer
 
 gen-keys:
 	@[ -f configs/jwt_rs256.pem ] || openssl genrsa -out configs/jwt_rs256.pem 2048
@@ -26,6 +28,24 @@ install: build
 	install -m 0644 configs/config.yaml $(SYSCONFDIR)/config.yaml
 	install -m 0600 configs/jwt_rs256.pem $(SYSCONFDIR)/jwt_rs256.pem
 	install -m 0644 configs/jwt_rs256_pub.pem $(SYSCONFDIR)/jwt_rs256_pub.pem
+
+install-systemd:
+	install -d $(SYSTEMD_UNITDIR)
+	install -m 0644 deployments/mosquitto-viewer.service $(SYSTEMD_UNITDIR)/$(SERVICE_NAME).service
+
+systemd-reload:
+	systemctl daemon-reload
+
+enable-service:
+	systemctl enable --now $(SERVICE_NAME)
+
+restart-service:
+	systemctl restart $(SERVICE_NAME)
+
+service-status:
+	systemctl status $(SERVICE_NAME) --no-pager
+
+deploy: install install-systemd systemd-reload enable-service
 
 clean:
 	rm -rf bin/ web/assets web/index.html frontend/dist

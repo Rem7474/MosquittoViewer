@@ -127,14 +127,28 @@ This builds:
 
 ## Deployment
 
-1. Run `sudo make install`.
-2. Install systemd unit from [deployments/mosquitto-viewer.service](deployments/mosquitto-viewer.service).
-3. Configure Nginx from [deployments/nginx.conf](deployments/nginx.conf).
-4. Enable and start service:
+1. Install binary + config:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now mosquitto-viewer
+sudo make install
+```
+
+2. Install and enable systemd service:
+
+```bash
+sudo make install-systemd
+sudo make systemd-reload
+sudo make enable-service
+```
+
+3. Configure a reverse proxy:
+      - Nginx: [deployments/nginx.conf](deployments/nginx.conf)
+      - Apache: [deployments/apache.conf](deployments/apache.conf)
+4. Optional service commands:
+
+```bash
+sudo make restart-service
+sudo make service-status
 ```
 
 ## Security Summary
@@ -142,8 +156,7 @@ sudo systemctl enable --now mosquitto-viewer
 - RS256 signed JWT tokens.
 - Short-lived access token + refresh token flow.
 - Auth required for logs API and WebSocket.
-- Nginx rate limiting for auth/API endpoints.
-- TLS termination and security headers.
+- Reverse proxy hardening (Nginx or Apache), including TLS termination and security headers.
 - systemd hardening options enabled.
 
 ## Tests
