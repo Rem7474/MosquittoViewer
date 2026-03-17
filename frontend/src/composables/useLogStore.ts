@@ -11,7 +11,7 @@ export function useLogStore(maxEntries = 1000) {
   })
 
   function push(entry: LogEntry) {
-    entries.value = [...entries.value, entry].slice(-maxEntries)
+    entries.value = [entry, ...entries.value].slice(0, maxEntries)
   }
 
   function clear() {

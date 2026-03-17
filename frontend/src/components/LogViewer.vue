@@ -107,14 +107,14 @@ function onSelect(entry: LogEntry) {
 function onScroll() {
   if (!listRef.value) return
   const threshold = 24
-  autoScroll.value = (listRef.value.scrollHeight - listRef.value.scrollTop - listRef.value.clientHeight) < threshold
+  autoScroll.value = listRef.value.scrollTop < threshold
 }
 
 watch(filteredEntries, () => {
   if (!paused.value && autoScroll.value && listRef.value) {
     requestAnimationFrame(() => {
       if (listRef.value) {
-        listRef.value.scrollTop = listRef.value.scrollHeight
+        listRef.value.scrollTop = 0
       }
     })
   }
