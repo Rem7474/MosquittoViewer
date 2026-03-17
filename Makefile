@@ -1,4 +1,4 @@
-.PHONY: dev build install install-systemd systemd-reload enable-service restart-service service-status deploy clean install-tools gen-keys hash-password
+.PHONY: dev build install install-systemd systemd systemd-reload enable-service restart-service service-status deploy clean install-tools gen-keys hash-password
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -32,6 +32,8 @@ install: build
 install-systemd:
 	install -d $(SYSTEMD_UNITDIR)
 	install -m 0644 deployments/mosquitto-viewer.service $(SYSTEMD_UNITDIR)/$(SERVICE_NAME).service
+
+systemd: install-systemd systemd-reload enable-service
 
 systemd-reload:
 	systemctl daemon-reload
