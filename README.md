@@ -144,6 +144,34 @@ sudo make enable-service
 3. Configure a reverse proxy:
       - Nginx: [deployments/nginx.conf](deployments/nginx.conf)
       - Apache: [deployments/apache.conf](deployments/apache.conf)
+
+Nginx (Debian/Ubuntu):
+
+```bash
+sudo cp deployments/nginx.conf /etc/nginx/sites-available/mosquitto-viewer.conf
+sudo ln -sf /etc/nginx/sites-available/mosquitto-viewer.conf /etc/nginx/sites-enabled/mosquitto-viewer.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Apache (Debian/Ubuntu):
+
+```bash
+sudo cp deployments/apache.conf /etc/apache2/sites-available/mosquitto-viewer.conf
+sudo a2enmod ssl headers proxy proxy_http proxy_wstunnel rewrite ratelimit
+sudo a2ensite mosquitto-viewer.conf
+sudo apache2ctl configtest
+sudo systemctl reload apache2
+```
+
+Apache (RHEL/CentOS/Rocky):
+
+```bash
+sudo cp deployments/apache.conf /etc/httpd/conf.d/mosquitto-viewer.conf
+sudo apachectl configtest
+sudo systemctl reload httpd
+```
+
 4. Optional service commands:
 
 ```bash
