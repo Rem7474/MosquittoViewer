@@ -15,11 +15,12 @@ import (
 )
 
 type Config struct {
-	Path        string
-	Format      string
-	CustomRegex string
-	BufferSize  int
-	Debug       bool
+	Path                string
+	Format              string
+	CustomRegex         string
+	BufferSize          int
+	ReadExistingOnStart bool
+	Debug               bool
 }
 
 type Watcher struct {
@@ -61,6 +62,9 @@ func New(cfg Config) *Watcher {
 func (w *Watcher) Start(ctx context.Context) error {
 	if strings.TrimSpace(w.path) == "" {
 		return errors.New("log path is empty")
+	}
+	if w.config.ReadExistingOnStart {
+		_ = w.bootstrapRecentEntries()
 	}
 	if err := w.openCurrentFile(true); err != nil && !os.IsNotExist(err) {
 		return err
@@ -229,6 +233,48 @@ func (w *Watcher) publish(entry LogEntry) {
 		}
 	}
 	w.subMu.RUnlock()
+}
+
+func (w *Watcher) bootstrapRecentEntries() error {
+	f, err := os.Open(w.path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	limit := len(w.entries)
+	if limit <= 0 {
+		return nil
+	}
+
+	lines := make([]string, 0, limit)
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(lines) < limit {
+			lines = append(lines, line)
+			continue
+		}
+		copy(lines, lines[1:])
+		lines[len(lines)-1] = line
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	for _, line := range lines {
+		id := w.nextID.Add(1)
+		entry, err := w.parser.ParseLine(line, id)
+		if err != nil {
+			if w.config.Debug {
+				entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: "DEBUG", Message: line, Raw: line}
+			} else {
+				continue
+			}
+		}
+		w.append(entry)
+	}
+	return nil
 }
 
 func matchFilters(e LogEntry, f Filters) bool {

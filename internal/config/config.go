@@ -22,10 +22,11 @@ type ServerConfig struct {
 }
 
 type LogConfig struct {
-	Path        string `yaml:"path"`
-	Format      string `yaml:"format"`
-	CustomRegex string `yaml:"custom_regex"`
-	BufferSize  int    `yaml:"buffer_size"`
+	Path                string `yaml:"path"`
+	Format              string `yaml:"format"`
+	CustomRegex         string `yaml:"custom_regex"`
+	BufferSize          int    `yaml:"buffer_size"`
+	ReadExistingOnStart bool   `yaml:"read_existing_on_start"`
 }
 
 type AuthConfig struct {

@@ -7,6 +7,7 @@ log:
   format: "mosquitto_standard"
   # custom_regex: '^(?P<ts>\d+): \[(?P<level>\w+)\] \[(?P<plugin>\w+)\] (?P<msg>.+)$'
   buffer_size: 1000
+  read_existing_on_start: true
 
 auth:
   users:

@@ -31,11 +31,12 @@ func main() {
 	}
 
 	watcher := logwatcher.New(logwatcher.Config{
-		Path:        cfg.Log.Path,
-		Format:      cfg.Log.Format,
-		CustomRegex: cfg.Log.CustomRegex,
-		BufferSize:  cfg.Log.BufferSize,
-		Debug:       cfg.Debug,
+		Path:                cfg.Log.Path,
+		Format:              cfg.Log.Format,
+		CustomRegex:         cfg.Log.CustomRegex,
+		BufferSize:          cfg.Log.BufferSize,
+		ReadExistingOnStart: cfg.Log.ReadExistingOnStart,
+		Debug:               cfg.Debug,
 	})
 
 	hub := ws.NewHub()
