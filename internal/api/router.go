@@ -49,16 +49,16 @@ func NewRouter(opts Options) http.Handler {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/auth/login", s.Login)
-	mux.HandleFunc("POST /api/auth/refresh", s.Refresh)
-	mux.Handle("GET /api/logs", auth.Middleware(s.jwtCfg, http.HandlerFunc(s.GetLogs)))
-	mux.HandleFunc("GET /api/ws", s.ServeWS)
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/auth/login", requireMethods([]string{http.MethodPost}, s.Login))
+	mux.HandleFunc("/api/auth/refresh", requireMethods([]string{http.MethodPost}, s.Refresh))
+	mux.Handle("/api/logs", auth.Middleware(s.jwtCfg, requireMethodsHandler([]string{http.MethodGet}, http.HandlerFunc(s.GetLogs))))
+	mux.HandleFunc("/api/ws", requireMethods([]string{http.MethodGet}, s.ServeWS))
+	mux.HandleFunc("/api/health", requireMethods([]string{http.MethodGet}, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "version": "1.0.0"})
-	})
+	}))
 
 	static := http.FileServer(http.FS(opts.WebFS))
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			http.NotFound(w, r)
 			return
@@ -97,4 +97,30 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
+}
+
+func requireMethods(allowed []string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		for _, m := range allowed {
+			if r.Method == m {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+		w.Header().Set("Allow", strings.Join(allowed, ", "))
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func requireMethodsHandler(allowed []string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, m := range allowed {
+			if r.Method == m {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+		w.Header().Set("Allow", strings.Join(allowed, ", "))
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
 }
