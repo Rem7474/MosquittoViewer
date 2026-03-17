@@ -134,6 +134,7 @@ sudo make install
 ```
 
 This also creates the system user/group `mosquitto-viewer` when missing.
+`make install` also rewrites JWT key paths in `/etc/mosquitto-viewer/config.yaml` to absolute paths under `/etc/mosquitto-viewer/`.
 
 2. Install and enable systemd service:
 

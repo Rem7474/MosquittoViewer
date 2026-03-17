@@ -32,6 +32,8 @@ install: build prepare-service-user
 	install -m 0755 bin/mosquitto-viewer $(BINDIR)/mosquitto-viewer
 	install -d -m 0750 -o root -g $(SERVICE_GROUP) $(SYSCONFDIR)
 	install -m 0640 -o root -g $(SERVICE_GROUP) configs/config.yaml $(SYSCONFDIR)/config.yaml
+	@sed -i 's|private_key_path: .*|private_key_path: "$(SYSCONFDIR)/jwt_rs256.pem"|' $(SYSCONFDIR)/config.yaml
+	@sed -i 's|public_key_path: .*|public_key_path: "$(SYSCONFDIR)/jwt_rs256_pub.pem"|' $(SYSCONFDIR)/config.yaml
 	install -m 0640 -o root -g $(SERVICE_GROUP) configs/jwt_rs256.pem $(SYSCONFDIR)/jwt_rs256.pem
 	install -m 0644 -o root -g $(SERVICE_GROUP) configs/jwt_rs256_pub.pem $(SYSCONFDIR)/jwt_rs256_pub.pem
 
