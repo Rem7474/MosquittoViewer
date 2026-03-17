@@ -63,13 +63,20 @@ func NewRouter(opts Options) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		if r.URL.Path == "/" || r.URL.Path == "" {
+			index, err := fs.ReadFile(opts.WebFS, "web/index.html")
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(index)
+			return
+		}
 		r2 := new(http.Request)
 		*r2 = *r
-		if r.URL.Path == "/" {
-			r2.URL.Path = "/web/index.html"
-		} else {
-			r2.URL.Path = "/web" + r.URL.Path
-		}
+		r2.URL.Path = "/web" + r.URL.Path
 		static.ServeHTTP(w, r2)
 	})
 
