@@ -14,6 +14,19 @@ export function useLogStore(maxEntries = 1000) {
     entries.value = [entry, ...entries.value].slice(0, maxEntries)
   }
 
+  function replaceEntries(nextEntries: LogEntry[]) {
+    const unique = new Map<number, LogEntry>()
+    for (const entry of nextEntries) {
+      unique.set(entry.id, entry)
+    }
+    entries.value = [...unique.values()]
+      .sort((a, b) => {
+        if (a.id !== b.id) return b.id - a.id
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      })
+      .slice(0, maxEntries)
+  }
+
   function clear() {
     entries.value = []
   }
@@ -41,9 +54,9 @@ export function useLogStore(maxEntries = 1000) {
 
   const ratePerSecond = computed(() => {
     if (entries.value.length < 2) return 0
-    const first = new Date(entries.value[0].timestamp).getTime()
-    const last = new Date(entries.value[entries.value.length - 1].timestamp).getTime()
-    const seconds = Math.max((last - first) / 1000, 1)
+    const newest = new Date(entries.value[0].timestamp).getTime()
+    const oldest = new Date(entries.value[entries.value.length - 1].timestamp).getTime()
+    const seconds = Math.max((newest - oldest) / 1000, 1)
     return Number((entries.value.length / seconds).toFixed(2))
   })
 
@@ -74,6 +87,7 @@ export function useLogStore(maxEntries = 1000) {
     totalCount,
     ratePerSecond,
     push,
+    replaceEntries,
     clear,
     exportJSON,
     exportCSV,

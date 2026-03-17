@@ -73,7 +73,7 @@ import { useWebSocket } from '../composables/useWebSocket'
 import type { LogEntry } from '../types/log'
 
 const { logout, accessToken, authFetch } = useAuth()
-const { filters, filteredEntries, countByLevel, totalCount, ratePerSecond, push, clear, exportJSON, exportCSV } = useLogStore(1000)
+const { filters, filteredEntries, countByLevel, totalCount, ratePerSecond, push, replaceEntries, clear, exportJSON, exportCSV } = useLogStore(1000)
 const { connected, paused, connect, disconnect, pause, resume, on } = useWebSocket(() => accessToken.value, 1000)
 
 const selected = ref<LogEntry | null>(null)
@@ -81,15 +81,19 @@ const wsConnected = computed(() => connected.value)
 const listRef = ref<HTMLElement | null>(null)
 const autoScroll = ref(true)
 const logPath = '/var/log/mosquitto/mosquitto.log'
+let pollTimer: number | null = null
 
 on('entry', (entry) => {
-  push(entry as LogEntry)
+  if (!paused.value) {
+    push(entry as LogEntry)
+  }
 })
 
-async function preloadLogs() {
+async function syncLogs() {
+  if (paused.value) return
   const res = await authFetch('/api/logs?limit=200')
   const data = await res.json() as { data: LogEntry[] }
-  data.data.forEach((e) => push(e))
+  replaceEntries(data.data)
 }
 
 function togglePause() {
@@ -121,11 +125,18 @@ watch(filteredEntries, () => {
 })
 
 onMounted(async () => {
-  await preloadLogs()
+  await syncLogs()
   connect()
+  pollTimer = window.setInterval(() => {
+    void syncLogs()
+  }, 1000)
 })
 
 onBeforeUnmount(() => {
+  if (pollTimer != null) {
+    window.clearInterval(pollTimer)
+    pollTimer = null
+  }
   disconnect()
 })
 </script>
