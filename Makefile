@@ -1,4 +1,4 @@
-.PHONY: dev build install prepare-service-user install-systemd systemd systemd-reload enable-service restart-service service-status deploy clean install-tools gen-keys hash-password
+.PHONY: dev build install prepare-service-user grant-log-access install-systemd systemd systemd-reload enable-service restart-service service-status deploy clean install-tools gen-keys hash-password
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -7,6 +7,7 @@ SYSTEMD_UNITDIR ?= /etc/systemd/system
 SERVICE_NAME ?= mosquitto-viewer
 SERVICE_USER ?= mosquitto-viewer
 SERVICE_GROUP ?= mosquitto-viewer
+LOG_PATH ?= /var/log/mosquitto/mosquitto.log
 
 gen-keys:
 	@[ -f configs/jwt_rs256.pem ] || openssl genrsa -out configs/jwt_rs256.pem 2048
@@ -41,6 +42,12 @@ install-systemd:
 	install -d $(SYSTEMD_UNITDIR)
 	install -m 0644 deployments/mosquitto-viewer.service $(SYSTEMD_UNITDIR)/$(SERVICE_NAME).service
 
+grant-log-access:
+	@test -f $(LOG_PATH) || (echo "Error: log file not found: $(LOG_PATH)" && exit 1)
+	@command -v setfacl >/dev/null || (echo "Error: setfacl not found. Install package 'acl' first." && exit 1)
+	setfacl -m u:$(SERVICE_USER):r $(LOG_PATH)
+	setfacl -m u:$(SERVICE_USER):x $$(dirname $(LOG_PATH))
+
 systemd: prepare-service-user install-systemd systemd-reload enable-service
 
 systemd-reload:
@@ -55,7 +62,7 @@ restart-service:
 service-status:
 	systemctl status $(SERVICE_NAME) --no-pager
 
-deploy: install install-systemd systemd-reload enable-service
+deploy: install install-systemd grant-log-access systemd-reload enable-service
 
 clean:
 	rm -rf bin/ web/assets web/index.html frontend/dist

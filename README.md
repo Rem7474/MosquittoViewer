@@ -140,6 +140,7 @@ This also creates the system user/group `mosquitto-viewer` when missing.
 
 ```bash
 sudo make install-systemd
+sudo make grant-log-access
 sudo make systemd-reload
 sudo make enable-service
 ```
@@ -148,6 +149,12 @@ Shortcut:
 
 ```bash
 sudo make systemd
+```
+
+If your Mosquitto log path differs, override it:
+
+```bash
+sudo make grant-log-access LOG_PATH=/path/to/mosquitto.log
 ```
 
 3. Configure a reverse proxy:
@@ -225,6 +232,14 @@ sudo make install
 sudo make systemd
 sudo make restart-service
 sudo make service-status
+```
+
+If logs do not appear and service shows `permission denied` on Mosquitto log file:
+
+```bash
+sudo apt-get install -y acl    # Debian/Ubuntu
+sudo make grant-log-access
+sudo make restart-service
 ```
 
 ## Security Summary
