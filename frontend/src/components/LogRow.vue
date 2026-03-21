@@ -2,6 +2,7 @@
   <div class="log-row" :class="[`lvl-${entry.level.toLowerCase()}`, { selected }]" @click="$emit('select', entry)">
     <span class="ts">{{ ts }}</span>
     <span class="lvl">{{ entry.level }}</span>
+    <span v-if="showSource && entry.source" class="src">{{ entry.source }}</span>
     <span class="msg">{{ entry.message }}</span>
   </div>
 </template>
@@ -14,6 +15,7 @@ import type { LogEntry } from '../types/log'
 const props = defineProps<{
   entry: LogEntry
   selected: boolean
+  showSource?: boolean
 }>()
 
 defineEmits<{

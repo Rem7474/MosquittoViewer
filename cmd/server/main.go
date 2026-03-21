@@ -30,14 +30,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	watcher := logwatcher.New(logwatcher.Config{
-		Path:                cfg.Log.Path,
-		Format:              cfg.Log.Format,
-		CustomRegex:         cfg.Log.CustomRegex,
-		BufferSize:          cfg.Log.BufferSize,
-		ReadExistingOnStart: cfg.Log.ReadExistingOnStart,
-		Debug:               cfg.Debug,
-	})
+	if len(cfg.Logs) == 0 {
+		logger.Error("no log sources configured – add at least one entry under 'logs:' in config")
+		os.Exit(1)
+	}
 
 	hub := ws.NewHub()
 	go hub.Run()
@@ -45,28 +41,49 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go func() {
-		if err := watcher.Start(ctx); err != nil {
-			logger.Error("watcher stopped", "error", err)
-		}
-	}()
+	watchers := make(map[string]*logwatcher.Watcher, len(cfg.Logs))
+	sourceOrder := make([]string, 0, len(cfg.Logs))
 
-	sub := watcher.Subscribe()
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case e := <-sub:
-				hub.Broadcast(e)
+	for _, src := range cfg.Logs {
+		w := logwatcher.New(logwatcher.Config{
+			Name:                src.Name,
+			Path:                src.Path,
+			Format:              src.Format,
+			CustomRegex:         src.CustomRegex,
+			BufferSize:          src.BufferSize,
+			ReadExistingOnStart: src.ReadExistingOnStart,
+			Debug:               cfg.Debug,
+		})
+		watchers[src.Name] = w
+		sourceOrder = append(sourceOrder, src.Name)
+
+		// Start watcher in background.
+		go func(name string, watcher *logwatcher.Watcher) {
+			if err := watcher.Start(ctx); err != nil {
+				logger.Error("watcher stopped", "source", name, "error", err)
 			}
-		}
-	}()
+		}(src.Name, w)
+
+		// Forward entries to the hub.
+		sub := w.Subscribe()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case e := <-sub:
+					hub.Broadcast(e)
+				}
+			}
+		}()
+	}
 
 	router := api.NewRouter(api.Options{
 		JWTConfig:    cfg.Auth.JWT,
 		Users:        cfg.Auth.Users,
-		Watcher:      watcher,
+		Watchers:     watchers,
+		SourceOrder:  sourceOrder,
+		Sources:      cfg.Logs,
 		Hub:          hub,
 		WebFS:        mosquittoviewer.WebFS,
 		AllowDevCORS: true,

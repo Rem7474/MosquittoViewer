@@ -6,7 +6,7 @@
       <div class="stats">
         <span>Total: {{ totalCount }}</span>
         <span>Rate: {{ ratePerSecond }}/s</span>
-        <span>E: {{ countByLevel.ERROR }}</span>
+        <span class="err-count">E: {{ countByLevel.ERROR }}</span>
       </div>
       <button class="logout" @click="logout">Logout</button>
     </header>
@@ -14,6 +14,7 @@
     <FilterBar
       v-model="filters"
       :paused="paused"
+      :sources="availableSources"
       @toggle-pause="togglePause"
       @clear="clear"
       @export-json="exportJSON"
@@ -31,7 +32,12 @@
         >
           <template #default="{ item, active }">
             <DynamicScrollerItem :item="item" :active="active" :size-dependencies="[(item as LogEntry).message]">
-              <LogRow :entry="item as LogEntry" :selected="selected?.id === (item as LogEntry).id" @select="onSelect" />
+              <LogRow
+                :entry="item as LogEntry"
+                :selected="selected?.id === (item as LogEntry).id"
+                :show-source="availableSources.length > 1"
+                @select="onSelect"
+              />
             </DynamicScrollerItem>
           </template>
         </DynamicScroller>
@@ -42,6 +48,7 @@
             :key="entry.id"
             :entry="entry"
             :selected="selected?.id === entry.id"
+            :show-source="availableSources.length > 1"
             @select="onSelect"
           />
         </template>
@@ -49,14 +56,15 @@
 
       <aside class="detail-panel">
         <h3>Detail</h3>
-        <pre v-if="selected">{{ selected }}</pre>
+        <pre v-if="selected">{{ JSON.stringify(selected, null, 2) }}</pre>
         <p v-else>Select a log row to inspect details.</p>
       </aside>
     </div>
 
     <footer class="statusbar">
-      <span>{{ filteredEntries.length }} logs / {{ totalCount }} en memoire</span>
-      <span>{{ logPath }}</span>
+      <span>{{ filteredEntries.length }} / {{ totalCount }} entrées en mémoire</span>
+      <span v-if="filters.source">{{ currentSourcePath }}</span>
+      <span v-else>{{ availableSources.length }} source(s)</span>
     </footer>
   </section>
 </template>
@@ -70,31 +78,55 @@ import LogRow from './LogRow.vue'
 import { useAuth } from '../composables/useAuth'
 import { useLogStore } from '../composables/useLogStore'
 import { useWebSocket } from '../composables/useWebSocket'
-import type { LogEntry } from '../types/log'
+import type { LogEntry, LogSource } from '../types/log'
 
 const { logout, accessToken, authFetch } = useAuth()
-const MAX_LOGS = 200
-const { filters, filteredEntries, countByLevel, totalCount, ratePerSecond, push, replaceEntries, clear, exportJSON, exportCSV } = useLogStore(MAX_LOGS)
+
+const MAX_LOGS = 500
+const { filters, filteredEntries, countByLevel, totalCount, ratePerSecond, push, replaceEntries, clear, exportJSON, exportCSV } =
+  useLogStore(MAX_LOGS)
+
 const { connected, paused, connect, disconnect, pause, resume, on } = useWebSocket(() => accessToken.value, MAX_LOGS)
 
 const selected = ref<LogEntry | null>(null)
 const wsConnected = computed(() => connected.value)
 const listRef = ref<HTMLElement | null>(null)
 const autoScroll = ref(true)
-const logPath = '/var/log/mosquitto/mosquitto.log'
-let pollTimer: number | null = null
+const availableSources = ref<LogSource[]>([])
 
+const currentSourcePath = computed(() => {
+  if (!filters.value.source) return ''
+  return availableSources.value.find((s) => s.name === filters.value.source)?.path ?? filters.value.source
+})
+
+// Push new WebSocket entries into the store (unless paused).
 on('entry', (entry) => {
   if (!paused.value) {
     push(entry as LogEntry)
   }
 })
 
+// Initial REST load – only runs once on mount.
 async function syncLogs() {
-  if (paused.value) return
-  const res = await authFetch(`/api/logs?limit=${MAX_LOGS}`)
-  const data = await res.json() as { data: LogEntry[] }
-  replaceEntries(data.data)
+  try {
+    const source = filters.value.source
+    const url = source ? `/api/logs?limit=${MAX_LOGS}&source=${encodeURIComponent(source)}` : `/api/logs?limit=${MAX_LOGS}`
+    const res = await authFetch(url)
+    const data = (await res.json()) as { data: LogEntry[] }
+    replaceEntries(data.data)
+  } catch {
+    // Ignore transient errors on mount.
+  }
+}
+
+async function fetchSources() {
+  try {
+    const res = await authFetch('/api/sources')
+    const data = (await res.json()) as { sources: LogSource[] }
+    availableSources.value = data.sources
+  } catch {
+    availableSources.value = []
+  }
 }
 
 function togglePause() {
@@ -118,26 +150,18 @@ function onScroll() {
 watch(filteredEntries, () => {
   if (!paused.value && autoScroll.value && listRef.value) {
     requestAnimationFrame(() => {
-      if (listRef.value) {
-        listRef.value.scrollTop = 0
-      }
+      if (listRef.value) listRef.value.scrollTop = 0
     })
   }
 })
 
 onMounted(async () => {
+  await fetchSources()
   await syncLogs()
   connect()
-  pollTimer = window.setInterval(() => {
-    void syncLogs()
-  }, 1000)
 })
 
 onBeforeUnmount(() => {
-  if (pollTimer != null) {
-    window.clearInterval(pollTimer)
-    pollTimer = null
-  }
   disconnect()
 })
 </script>

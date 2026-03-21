@@ -13,23 +13,25 @@ import (
 )
 
 type Server struct {
-	jwtCfg         config.JWTConfig
-	users          map[string]string
-	watcher        *logwatcher.Watcher
-	hub            *ws.Hub
-	webFS          fs.FS
-	allowDevCORS   bool
-	defaultFilters logwatcher.Filters
+	jwtCfg      config.JWTConfig
+	users       map[string]string
+	watchers    map[string]*logwatcher.Watcher // keyed by source name
+	sourceOrder []string                        // ordered list of source names
+	sources     []config.LogSourceConfig        // raw config, for metadata
+	hub         *ws.Hub
+	webFS       fs.FS
+	allowDevCORS bool
 }
 
 type Options struct {
-	JWTConfig     config.JWTConfig
-	Users         []config.UserConfig
-	Watcher       *logwatcher.Watcher
-	Hub           *ws.Hub
-	WebFS         fs.FS
-	AllowDevCORS  bool
-	DefaultFilter logwatcher.Filters
+	JWTConfig    config.JWTConfig
+	Users        []config.UserConfig
+	Watchers     map[string]*logwatcher.Watcher
+	SourceOrder  []string
+	Sources      []config.LogSourceConfig
+	Hub          *ws.Hub
+	WebFS        fs.FS
+	AllowDevCORS bool
 }
 
 func NewRouter(opts Options) http.Handler {
@@ -39,19 +41,21 @@ func NewRouter(opts Options) http.Handler {
 	}
 
 	s := &Server{
-		jwtCfg:         opts.JWTConfig,
-		users:          users,
-		watcher:        opts.Watcher,
-		hub:            opts.Hub,
-		webFS:          opts.WebFS,
-		allowDevCORS:   opts.AllowDevCORS,
-		defaultFilters: opts.DefaultFilter,
+		jwtCfg:       opts.JWTConfig,
+		users:        users,
+		watchers:     opts.Watchers,
+		sourceOrder:  opts.SourceOrder,
+		sources:      opts.Sources,
+		hub:          opts.Hub,
+		webFS:        opts.WebFS,
+		allowDevCORS: opts.AllowDevCORS,
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/auth/login", requireMethods([]string{http.MethodPost}, s.Login))
 	mux.HandleFunc("/api/auth/refresh", requireMethods([]string{http.MethodPost}, s.Refresh))
 	mux.Handle("/api/logs", auth.Middleware(s.jwtCfg, requireMethodsHandler([]string{http.MethodGet}, http.HandlerFunc(s.GetLogs))))
+	mux.Handle("/api/sources", auth.Middleware(s.jwtCfg, requireMethodsHandler([]string{http.MethodGet}, http.HandlerFunc(s.GetSources))))
 	mux.HandleFunc("/api/ws", requireMethods([]string{http.MethodGet}, s.ServeWS))
 	mux.HandleFunc("/api/health", requireMethods([]string{http.MethodGet}, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "version": "1.0.0"})

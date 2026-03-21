@@ -10,6 +10,7 @@ import (
 
 type LogEntry struct {
 	ID        int64     `json:"id"`
+	Source    string    `json:"source,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 	Level     string    `json:"level"`
 	Message   string    `json:"message"`

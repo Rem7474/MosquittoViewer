@@ -5,15 +5,18 @@ export function useLogStore(maxEntries = 1000) {
   const entries = shallowRef<LogEntry[]>([])
   const filters = ref<LogFilters>({
     level: 'ALL',
+    source: '',
     search: '',
     clientId: '',
     topic: '',
   })
 
+  /** Prepend a single new entry (from WebSocket). */
   function push(entry: LogEntry) {
     entries.value = [entry, ...entries.value].slice(0, maxEntries)
   }
 
+  /** Replace the whole buffer (initial REST load). */
   function replaceEntries(nextEntries: LogEntry[]) {
     const unique = new Map<number, LogEntry>()
     for (const entry of nextEntries) {
@@ -36,6 +39,7 @@ export function useLogStore(maxEntries = 1000) {
     const s = f.search.toLowerCase()
     return entries.value.filter((e) => {
       if (f.level !== 'ALL' && e.level !== f.level) return false
+      if (f.source && e.source !== f.source) return false
       if (f.clientId && e.client_id !== f.clientId) return false
       if (f.topic && !e.topic?.toLowerCase().includes(f.topic.toLowerCase())) return false
       if (s && !(`${e.message} ${e.raw}`.toLowerCase().includes(s))) return false
@@ -65,9 +69,10 @@ export function useLogStore(maxEntries = 1000) {
   }
 
   function exportCSV() {
-    const header = 'id,timestamp,level,message,client_id,topic,plugin,raw'
+    const header = 'id,source,timestamp,level,message,client_id,topic,plugin,raw'
     const rows = filteredEntries.value.map((e) => [
       e.id,
+      csvCell(e.source ?? ''),
       csvCell(e.timestamp),
       csvCell(e.level),
       csvCell(e.message),

@@ -11,6 +11,16 @@
       </button>
     </div>
 
+    <select
+      v-if="sources.length > 0"
+      class="source-select"
+      :value="modelValue.source"
+      @change="$emit('update:modelValue', { ...modelValue, source: ($event.target as HTMLSelectElement).value })"
+    >
+      <option value="">All sources</option>
+      <option v-for="s in sources" :key="s.name" :value="s.name">{{ s.name }}</option>
+    </select>
+
     <input
       class="search"
       type="text"
@@ -43,11 +53,12 @@
 </template>
 
 <script setup lang="ts">
-import type { LogFilters } from '../types/log'
+import type { LogFilters, LogSource } from '../types/log'
 
 defineProps<{
   modelValue: LogFilters
   paused: boolean
+  sources: LogSource[]
 }>()
 
 defineEmits<{

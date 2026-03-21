@@ -2,12 +2,21 @@ server:
   port: 8080
   host: "127.0.0.1"
 
-log:
-  path: "/var/log/mosquitto/mosquitto.log"
-  format: "mosquitto_standard"
-  # custom_regex: '^(?P<ts>\d+): \[(?P<level>\w+)\] \[(?P<plugin>\w+)\] (?P<msg>.+)$'
-  buffer_size: 200
-  read_existing_on_start: true
+# Multiple log sources – add as many entries as needed.
+logs:
+  - name: "mosquitto"
+    path: "/var/log/mosquitto/mosquitto.log"
+    format: "mosquitto_standard"
+    buffer_size: 500
+    read_existing_on_start: true
+
+  # Example: watch a second file with a custom regex
+  # - name: "syslog"
+  #   path: "/var/log/syslog"
+  #   format: "custom"
+  #   custom_regex: '^(?P<ts>\w{3}\s+\d+\s+[\d:]+)\s+\S+\s+(?P<msg>.+)$'
+  #   buffer_size: 200
+  #   read_existing_on_start: false
 
 auth:
   users:

@@ -204,11 +204,39 @@ button {
 
 .log-row {
   display: grid;
-  grid-template-columns: 140px 70px 1fr;
+  grid-template-columns: 140px 60px 1fr;
   gap: 10px;
   padding: 7px 12px;
   border-bottom: 1px solid rgba(20, 30, 48, 0.5);
   cursor: pointer;
+}
+
+/* When source badge is shown, insert an extra column */
+.log-row:has(.src) {
+  grid-template-columns: 140px 60px 80px 1fr;
+}
+
+.src {
+  color: var(--accent);
+  opacity: 0.7;
+  font-size: 0.82em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-select {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.err-count {
+  color: var(--error);
 }
 
 .log-row:hover,

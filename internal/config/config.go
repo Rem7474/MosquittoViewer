@@ -9,11 +9,11 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	Log    LogConfig    `yaml:"log"`
-	Auth   AuthConfig   `yaml:"auth"`
-	SQLite SQLiteConfig `yaml:"sqlite"`
-	Debug  bool         `yaml:"debug"`
+	Server ServerConfig      `yaml:"server"`
+	Logs   []LogSourceConfig `yaml:"logs"`
+	Auth   AuthConfig        `yaml:"auth"`
+	SQLite SQLiteConfig      `yaml:"sqlite"`
+	Debug  bool              `yaml:"debug"`
 }
 
 type ServerConfig struct {
@@ -21,7 +21,9 @@ type ServerConfig struct {
 	Host string `yaml:"host"`
 }
 
-type LogConfig struct {
+// LogSourceConfig defines a single log file source.
+type LogSourceConfig struct {
+	Name                string `yaml:"name"`
 	Path                string `yaml:"path"`
 	Format              string `yaml:"format"`
 	CustomRegex         string `yaml:"custom_regex"`
@@ -66,8 +68,16 @@ func Load(path string) (Config, error) {
 	if cfg.Server.Port == 0 {
 		cfg.Server.Port = 8080
 	}
-	if cfg.Log.BufferSize <= 0 {
-		cfg.Log.BufferSize = 1000
+	for i := range cfg.Logs {
+		if cfg.Logs[i].Name == "" {
+			cfg.Logs[i].Name = fmt.Sprintf("source%d", i+1)
+		}
+		if cfg.Logs[i].BufferSize <= 0 {
+			cfg.Logs[i].BufferSize = 500
+		}
+		if cfg.Logs[i].Format == "" {
+			cfg.Logs[i].Format = "mosquitto_standard"
+		}
 	}
 	if cfg.Auth.JWT.AccessTokenTTL == "" {
 		cfg.Auth.JWT.AccessTokenTTL = "15m"

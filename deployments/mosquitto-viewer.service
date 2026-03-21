@@ -1,6 +1,8 @@
 [Unit]
-Description=MosquittoViewer MQTT Log Dashboard
+Description=MosquittoViewer – MQTT Log Dashboard
+Documentation=https://github.com/example/mosquitto-viewer
 After=network.target mosquitto.service
+Wants=mosquitto.service
 
 [Service]
 Type=simple
@@ -10,11 +12,24 @@ ExecStart=/usr/local/bin/mosquitto-viewer --config /etc/mosquitto-viewer/config.
 Restart=on-failure
 RestartSec=5s
 
+# ── Filesystem hardening ───────────────────────────────────────────────────────
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadOnlyPaths=/var/log/mosquitto
 PrivateTmp=true
+PrivateDevices=true
+
+# Grant read access to each log directory listed under 'logs:' in config.yaml.
+# Add one ReadOnlyPaths= line per directory. The service user must also have
+# ACL read permission on the files themselves (see: make grant-log-access).
+ReadOnlyPaths=/var/log/mosquitto
+
+# Example: uncomment and adapt if watching files in other directories:
+# ReadOnlyPaths=/var/log/myapp
+# ReadOnlyPaths=/srv/logs/custom
+
+# Config directory (read-only)
+ReadOnlyPaths=/etc/mosquitto-viewer
 
 [Install]
 WantedBy=multi-user.target

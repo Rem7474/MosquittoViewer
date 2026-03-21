@@ -15,6 +15,7 @@ import (
 )
 
 type Config struct {
+	Name                string
 	Path                string
 	Format              string
 	CustomRegex         string
@@ -58,6 +59,9 @@ func New(cfg Config) *Watcher {
 		path:    cfg.Path,
 	}
 }
+
+func (w *Watcher) Name() string { return w.config.Name }
+func (w *Watcher) Path() string { return w.config.Path }
 
 func (w *Watcher) Start(ctx context.Context) error {
 	if strings.TrimSpace(w.path) == "" {
@@ -117,6 +121,12 @@ func (w *Watcher) Subscribe() chan LogEntry {
 	w.subs[ch] = struct{}{}
 	w.subMu.Unlock()
 	return ch
+}
+
+func (w *Watcher) Unsubscribe(ch chan LogEntry) {
+	w.subMu.Lock()
+	delete(w.subs, ch)
+	w.subMu.Unlock()
 }
 
 func (w *Watcher) Recent(n int, filters Filters) []LogEntry {
@@ -189,14 +199,10 @@ func (w *Watcher) readNewLines() error {
 		id := w.nextID.Add(1)
 		entry, err := w.parser.ParseLine(line, id)
 		if err != nil {
-			level := "INFO"
-			if w.config.Debug {
-				level = "DEBUG"
-			} else {
-				level = detectLevel(line)
-			}
+			level := detectLevel(line)
 			entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: level, Message: line, Raw: line}
 		}
+		entry.Source = w.config.Name
 		w.append(entry)
 		w.publish(entry)
 	}
@@ -268,14 +274,9 @@ func (w *Watcher) bootstrapRecentEntries() error {
 		id := w.nextID.Add(1)
 		entry, err := w.parser.ParseLine(line, id)
 		if err != nil {
-			level := "INFO"
-			if w.config.Debug {
-				level = "DEBUG"
-			} else {
-				level = detectLevel(line)
-			}
-			entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: level, Message: line, Raw: line}
+			entry = LogEntry{ID: id, Timestamp: time.Now().UTC(), Level: detectLevel(line), Message: line, Raw: line}
 		}
+		entry.Source = w.config.Name
 		w.append(entry)
 	}
 	return nil
