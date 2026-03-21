@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import ConnectionStatus from './ConnectionStatus.vue'
 import FilterBar from './FilterBar.vue'
@@ -91,6 +91,9 @@ const { connected, paused, connect, disconnect, pause, resume, on } = useWebSock
 const selected = ref<LogEntry | null>(null)
 const wsConnected = computed(() => connected.value)
 const listRef = ref<HTMLElement | null>(null)
+// autoScroll stays true as long as the user is within ROW_HEIGHT of the top.
+// A row is ~32 px; we allow a couple of rows of tolerance.
+const ROW_HEIGHT = 32
 const autoScroll = ref(true)
 const availableSources = ref<LogSource[]>([])
 
@@ -143,22 +146,25 @@ function onSelect(entry: LogEntry) {
 
 function onScroll() {
   if (!listRef.value) return
-  const threshold = 24
-  autoScroll.value = listRef.value.scrollTop < threshold
+  autoScroll.value = listRef.value.scrollTop < ROW_HEIGHT * 2
 }
 
 watch(filteredEntries, () => {
-  if (!paused.value && autoScroll.value && listRef.value) {
+  if (paused.value || !autoScroll.value || !listRef.value) return
+  // Use nextTick + rAF: wait for Vue to finish patching the DOM, then scroll.
+  // Without nextTick the scroll fires before new rows are painted.
+  void nextTick(() => {
     requestAnimationFrame(() => {
       if (listRef.value) listRef.value.scrollTop = 0
     })
-  }
+  })
 })
 
 onMounted(async () => {
   await fetchSources()
-  await syncLogs()
+  // Connect first so we don't miss entries that arrive while syncLogs() is in flight.
   connect()
+  await syncLogs()
 })
 
 onBeforeUnmount(() => {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/example/mosquitto-viewer/internal/auth"
@@ -67,21 +68,24 @@ func NewRouter(opts Options) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		if r.URL.Path == "/" || r.URL.Path == "" {
-			index, err := fs.ReadFile(opts.WebFS, "web/index.html")
-			if err != nil {
-				http.NotFound(w, r)
-				return
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(index)
+		// Static assets have a file extension (e.g. /assets/main.js, /favicon.ico).
+		// SPA routes (/login, /dashboard, …) have no extension and must all receive
+		// index.html so Vue Router can handle them client-side.
+		if r.URL.Path != "/" && strings.Contains(path.Base(r.URL.Path), ".") {
+			r2 := new(http.Request)
+			*r2 = *r
+			r2.URL.Path = "/web" + r.URL.Path
+			static.ServeHTTP(w, r2)
 			return
 		}
-		r2 := new(http.Request)
-		*r2 = *r
-		r2.URL.Path = "/web" + r.URL.Path
-		static.ServeHTTP(w, r2)
+		index, err := fs.ReadFile(opts.WebFS, "web/index.html")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(index)
 	})
 
 	h := http.Handler(mux)

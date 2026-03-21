@@ -3,6 +3,10 @@ import type { LogEntry, LogFilters } from '../types/log'
 
 export function useLogStore(maxEntries = 1000) {
   const entries = shallowRef<LogEntry[]>([])
+
+  // O(1) duplicate detection – tracks source:id of every entry currently in the buffer.
+  const entryIds = new Set<string>()
+
   const filters = ref<LogFilters>({
     level: 'ALL',
     source: '',
@@ -11,27 +15,58 @@ export function useLogStore(maxEntries = 1000) {
     topic: '',
   })
 
-  /** Prepend a single new entry (from WebSocket). */
-  function push(entry: LogEntry) {
-    entries.value = [entry, ...entries.value].slice(0, maxEntries)
+  function entryKey(e: LogEntry): string {
+    return `${e.source ?? ''}:${e.id}`
   }
 
-  /** Replace the whole buffer (initial REST load). */
-  function replaceEntries(nextEntries: LogEntry[]) {
-    const unique = new Map<number, LogEntry>()
-    for (const entry of nextEntries) {
-      unique.set(entry.id, entry)
+  /** Prepend a single new entry (from WebSocket). Silently drops duplicates. */
+  function push(entry: LogEntry) {
+    const key = entryKey(entry)
+    if (entryIds.has(key)) return
+
+    entryIds.add(key)
+    const next = [entry, ...entries.value]
+    // When the buffer is full, evict the oldest entry and remove its key.
+    if (next.length > maxEntries) {
+      const evicted = next[next.length - 1]
+      entryIds.delete(entryKey(evicted))
+      next.length = maxEntries
     }
-    entries.value = [...unique.values()]
+    entries.value = next
+  }
+
+  /**
+   * Merge REST history with any entries already delivered by WebSocket
+   * (to avoid losing entries that arrived between connect() and the REST response).
+   */
+  function replaceEntries(restEntries: LogEntry[]) {
+    const unique = new Map<string, LogEntry>()
+
+    // Seed with current buffer (WS-delivered entries, may include entries newer than REST).
+    for (const e of entries.value) {
+      unique.set(entryKey(e), e)
+    }
+    // REST data is canonical – overwrite duplicates.
+    for (const e of restEntries) {
+      unique.set(entryKey(e), e)
+    }
+
+    const sorted = [...unique.values()]
       .sort((a, b) => {
         if (a.id !== b.id) return b.id - a.id
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       })
       .slice(0, maxEntries)
+
+    // Rebuild ID set to match the new buffer exactly.
+    entryIds.clear()
+    for (const e of sorted) entryIds.add(entryKey(e))
+    entries.value = sorted
   }
 
   function clear() {
     entries.value = []
+    entryIds.clear()
   }
 
   const filteredEntries = computed(() => {
