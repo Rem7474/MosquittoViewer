@@ -4,8 +4,9 @@ import type { LogEntry, LogFilters } from '../types/log'
 export function useLogStore(maxEntries = 1000) {
   const entries = shallowRef<LogEntry[]>([])
 
-  // O(1) duplicate detection – tracks source:id of every entry currently in the buffer.
-  const entryIds = new Set<string>()
+  // Highest ID seen per source. push() rejects anything at or below this.
+  // Keyed by source name ('' if absent).
+  const watermark = new Map<string, number>()
 
   const filters = ref<LogFilters>({
     level: 'ALL',
@@ -15,58 +16,47 @@ export function useLogStore(maxEntries = 1000) {
     topic: '',
   })
 
-  function entryKey(e: LogEntry): string {
-    return `${e.source ?? ''}:${e.id}`
-  }
-
-  /** Prepend a single new entry (from WebSocket). Silently drops duplicates. */
+  /** Prepend a live entry from WebSocket. Drops entries already loaded via REST. */
   function push(entry: LogEntry) {
-    const key = entryKey(entry)
-    if (entryIds.has(key)) return
+    const src = entry.source ?? ''
+    const hi = watermark.get(src) ?? -1
+    if (entry.id <= hi) return   // already in buffer from REST load
 
-    entryIds.add(key)
+    watermark.set(src, entry.id)
     const next = [entry, ...entries.value]
-    // When the buffer is full, evict the oldest entry and remove its key.
-    if (next.length > maxEntries) {
-      const evicted = next[next.length - 1]
-      entryIds.delete(entryKey(evicted))
-      next.length = maxEntries
-    }
+    if (next.length > maxEntries) next.length = maxEntries
     entries.value = next
   }
 
   /**
-   * Merge REST history with any entries already delivered by WebSocket
-   * (to avoid losing entries that arrived between connect() and the REST response).
+   * Replace the buffer with REST history.
+   * Any live entries already pushed by WebSocket (id > REST max) are preserved.
    */
   function replaceEntries(restEntries: LogEntry[]) {
     const unique = new Map<string, LogEntry>()
 
-    // Seed with current buffer (WS-delivered entries, may include entries newer than REST).
-    for (const e of entries.value) {
-      unique.set(entryKey(e), e)
-    }
-    // REST data is canonical – overwrite duplicates.
-    for (const e of restEntries) {
-      unique.set(entryKey(e), e)
-    }
+    // Keep WS-delivered entries that are newer than anything in the REST payload.
+    for (const e of entries.value) unique.set(`${e.source ?? ''}:${e.id}`, e)
+    // REST data is canonical for its range.
+    for (const e of restEntries) unique.set(`${e.source ?? ''}:${e.id}`, e)
 
     const sorted = [...unique.values()]
-      .sort((a, b) => {
-        if (a.id !== b.id) return b.id - a.id
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      })
+      .sort((a, b) => b.id - a.id || new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, maxEntries)
 
-    // Rebuild ID set to match the new buffer exactly.
-    entryIds.clear()
-    for (const e of sorted) entryIds.add(entryKey(e))
+    // Rebuild watermark from the merged result so push() knows what's already present.
+    watermark.clear()
+    for (const e of sorted) {
+      const src = e.source ?? ''
+      if ((watermark.get(src) ?? -1) < e.id) watermark.set(src, e.id)
+    }
+
     entries.value = sorted
   }
 
   function clear() {
     entries.value = []
-    entryIds.clear()
+    watermark.clear()
   }
 
   const filteredEntries = computed(() => {
@@ -83,8 +73,8 @@ export function useLogStore(maxEntries = 1000) {
   })
 
   const countByLevel = computed(() => ({
-    INFO: entries.value.filter((e) => e.level === 'INFO').length,
-    WARN: entries.value.filter((e) => e.level === 'WARN').length,
+    INFO:  entries.value.filter((e) => e.level === 'INFO').length,
+    WARN:  entries.value.filter((e) => e.level === 'WARN').length,
     ERROR: entries.value.filter((e) => e.level === 'ERROR').length,
     DEBUG: entries.value.filter((e) => e.level === 'DEBUG').length,
   }))
@@ -119,32 +109,19 @@ export function useLogStore(maxEntries = 1000) {
     downloadBlob([header, ...rows].join('\n'), 'text/csv', 'logs.csv')
   }
 
-  return {
-    entries,
-    filters,
-    filteredEntries,
-    countByLevel,
-    totalCount,
-    ratePerSecond,
-    push,
-    replaceEntries,
-    clear,
-    exportJSON,
-    exportCSV,
-  }
+  return { entries, filters, filteredEntries, countByLevel, totalCount, ratePerSecond, push, replaceEntries, clear, exportJSON, exportCSV }
 }
 
 function csvCell(value: string | number): string {
-  const text = String(value).replaceAll('"', '""')
-  return `"${text}"`
+  return `"${String(value).replaceAll('"', '""')}"`
 }
 
 function downloadBlob(content: string, contentType: string, filename: string) {
   const blob = new Blob([content], { type: contentType })
   const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
   URL.revokeObjectURL(url)
 }
